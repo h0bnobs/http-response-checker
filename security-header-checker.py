@@ -1,6 +1,9 @@
 import argparse
 from wsgiref import headers
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
 import json
 import requests
 from termcolor import colored
@@ -9,6 +12,7 @@ import re
 import json
 import os
 import ast
+import sys
 
 # https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html
 security_headers = {
@@ -52,7 +56,7 @@ security_headers = {
 }
 
 
-# requirements : import requests, from termcolor import colored, from selenium import webdriver
+# requirements : import requests, from termcolor import colored, from selenium import webdriver, from webdriver_manager.chrome import ChromeDriverManager
 
 def banner():
     text = r"""
@@ -70,7 +74,7 @@ usage: security-header-checker -u <url> -i <input_file> -o <output_file> -nO <ou
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Security header checker')
-    parser.add_argument('-u', '--url', dest="target", help='Target url')
+    parser.add_argument('-u', '--url', dest="target", help='The target URL to be scanned')
     parser.add_argument('-i', '--input_file', dest="input_file", help='Input file')
     parser.add_argument('-o', '--output_file', dest="output_file", help='Sends output to a file')
     parser.add_argument('-nO', '--no-print-output', dest="no_print_output", help='Prints far less to terminal and '
@@ -160,25 +164,37 @@ def print_cookies(target_url):
     Prints the cookies of the target page. Uses selenium to find the cookies, meaning it'll flash a chrome window up.
     :param target_url: The url of the page.
     """
-    driver = webdriver.Chrome()
-    driver.get(target_url)
-    cookies = driver.get_cookies()
-    final_cookies = []
-    for dictionary in cookies:
-        temp_dictionary = {
-            "name": dictionary["name"],
-            "value": dictionary["value"],
-            "httpOnly": dictionary['httpOnly'],
-            "secure": dictionary['secure']
-        }
-        final_cookies.append(temp_dictionary)
+    # options for headless mode so it doesnt flash on screen - gpt special
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")  # Run in headless mode
+    chrome_options.add_argument("--no-sandbox")  # Required for some environments
+    chrome_options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
+
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+    try:
+        driver.get(target_url)
+        cookies = driver.get_cookies()
+        final_cookies = []
+        for dictionary in cookies:
+            temp_dictionary = {
+                "name": dictionary["name"],
+                "value": dictionary["value"],
+                "httpOnly": dictionary['httpOnly'],
+                "secure": dictionary['secure']
+            }
+            final_cookies.append(temp_dictionary)
+    finally:
+        driver.quit()
 
     # nice printing
     if len(final_cookies) > 0:
         if len(final_cookies) == 1:
             print("\n " + COLOURS["plus"] + " The following cookie was found on " + target_url + ":" + COLOURS["end"])
-        print("\n " + COLOURS["plus"] + " The following cookies were found on " + target_url + ":" + COLOURS["end"])
-        print(json.dumps(final_cookies, indent=4))
+            print(json.dumps(final_cookies, indent=4))
+        else:
+            print("\n " + COLOURS["plus"] + " The following " + str(
+                len(final_cookies)) + " cookies were found on " + target_url + ":" + COLOURS["end"])
+            print(json.dumps(final_cookies, indent=4))
     else:
         print("\n " + COLOURS["cross"] + " No cookies found on " + target_url + COLOURS["end"])
 
@@ -194,15 +210,15 @@ def print_headers(target_url):
 
     # pretty printing logic
     pretty_print = {}
-    print("\n" + COLOURS["plus"] + " Printing headers from " + target_url + " for inspection:" + COLOURS["end"] + "\n")
+    print("\n" + COLOURS["plus"] + " Here are the headers from " + target_url + " for inspection:" + COLOURS["end"] + "\n")
     for header in headers:
         # if there are security headers present, we need to see them so that we can
         if header in security_headers.keys():
             count += 1
-            print(str(count) + ") The header: " + colored("" + header + ": " + headers[header],
+            print(str(count) + ") The following header: " + colored("" + header + ": " + headers[header],
                                                           "red") + " is present on this page")
             pretty_print.update({str(count) + ") " + header: security_headers[header]})
-    print("\n")
+    print("\n" + COLOURS["plus"] + " Here are the recommendations for the security headers that were found on " + target_url + ":" + COLOURS["end"] + "\n")
     print_pretty(pretty_print)
 
 
@@ -246,71 +262,106 @@ def get_cookies(target_url):
     :param target_url: The url of the page.
     :return final_cookies: A dictionary of the cookies.
     """
-    driver = webdriver.Chrome()
-    driver.get(target_url)
-    cookies = driver.get_cookies()
-    final_cookies = []
-    for dictionary in cookies:
-        temp_dictionary = {
-            "name": dictionary["name"],
-            "value": dictionary["value"],
-            "httpOnly": dictionary['httpOnly'],
-            "secure": dictionary['secure']
-        }
-        final_cookies.append(temp_dictionary)
+    # options for headless mode so it doesnt flash on screen - gpt special
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")  # Run in headless mode
+    chrome_options.add_argument("--no-sandbox")  # Required for some environments
+    chrome_options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
+
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
+    try:
+        driver.get(target_url)
+        cookies = driver.get_cookies()
+        final_cookies = []
+        for dictionary in cookies:
+            temp_dictionary = {
+                "name": dictionary["name"],
+                "value": dictionary["value"],
+                "httpOnly": dictionary['httpOnly'],
+                "secure": dictionary['secure']
+            }
+            final_cookies.append(temp_dictionary)
+    finally:
+        driver.quit()
 
     return final_cookies
 
 
 if __name__ == '__main__':
     banner()
-
-    # TODO: make the url a txt file with a bunch of directories with a base url.
-    # TODO: just -o
-
     args = parse_args()
 
-    # if -u and -nO
-    if args.target and args.no_print_output:
-        filename = args.no_print_output
-        if os.path.exists(filename):
-            with open(filename, 'w') as file:
-                file.write(f"Headers:\n")
-        if not os.path.exists(filename):
-            with open(filename, 'w') as file:
-                file.write('Headers:')
-        formatted_content = json.dumps(get_headers(args.target), indent=4)
-        with open('output', 'a') as file:
-            file.write(formatted_content)
-        formatted_content = json.dumps(get_cookies(args.target), indent=4)
-        with open('output', 'a') as file:
-            file.write(f"\nCookies:\n")
-            file.write(formatted_content)
+    if args.no_print_output and args.output_file:
+        print("-o and -nO cannot be used at the same time!")
+        sys.exit()
 
-    # or if -i and -nO
-    elif args.input_file and args.no_print_output:
-        print("####")
+    def create_or_empty_file(filepath):
+        if filepath:
+            with open(filepath, 'w') as file:
+                file.write('')
 
-    if not args.no_print_output:
-        # if just the -u flag is used:
-        if args.target:
-            parsed_url = urlparse(args.target)
-            base_url = parsed_url.netloc
-            print("\n" + COLOURS["plus"] + " Base URL: " + base_url + COLOURS["end"])
-            print_headers(args.target)
-            print_cookies(args.target)
-        # or if the -i flag is used:
-        elif args.input_file: # TODO: determine if its a simple .txt file
-            f = open(args.input_file, "r")
-            tool_name = output_type(args.input_file)
-            data = f.read()
-            if tool_name == 'ffuf':
-                urls = ffuf_parser(data)
-                for url in urls:
-                    print_headers(url)
-                    print_cookies(url)
-            elif tool_name == 'dirb':
-                urls = dirb_parser(args.input_file)
-                for url in urls:
-                    print_headers(url)
-                    print_cookies(url)
+    create_or_empty_file(args.output_file)
+    create_or_empty_file(args.no_print_output)
+
+    def process_url(url):
+        formatted_headers = json.dumps(get_headers(url), indent=4)
+        formatted_cookies = json.dumps(get_cookies(url), indent=4)
+        output_content = (
+            f"\nHeaders for {url}:\n{formatted_headers}\n"
+            f"\nCookies for {url}:\n{formatted_cookies}\n"
+        )
+        if args.no_print_output:
+            with open(args.no_print_output, 'a') as file:
+                file.write(output_content)
+        else:
+            print_headers(url)
+            print_cookies(url)
+            if args.output_file:
+                with open(args.output_file, 'a') as file:
+                    file.write(output_content)
+
+
+    if args.target:
+        process_url(args.target)
+
+    if args.input_file:
+        tool_name = output_type(args.input_file)
+        with open(args.input_file, 'r') as file:
+            data = file.read()
+
+        urls = []
+        if tool_name == 'ffuf':
+            urls = ffuf_parser(data)
+        elif tool_name == 'dirb':
+            urls = dirb_parser(args.input_file)
+        elif args.input_file.endswith('.txt'):
+            urls = [line.strip() for line in data.splitlines()]
+
+        count = 0
+        total_urls = len(urls)
+
+        quarter_mark = total_urls / 4
+        half_mark = total_urls / 2
+        three_quarters_mark = 3 * total_urls / 4
+
+        printed_quarter = False
+        printed_half = False
+        printed_three_quarters = False
+
+        for url in urls:
+            count += 1
+            process_url(url)
+
+            if total_urls >= 8:
+                if count > quarter_mark and not printed_quarter:
+                    print(colored('\n\n### Quarter of the way through ###\n', 'green'))
+                    printed_quarter = True
+                if count > half_mark and not printed_half:
+                    print(colored('\n\n### Halfway through ###\n', 'green'))
+                    printed_half = True
+                if count > three_quarters_mark and not printed_three_quarters:
+                    print(colored('\n\n### Three quarters of the way through ###\n', 'green'))
+                    printed_three_quarters = True
+
+    print(colored('\nAll done! Finishing up...', 'cyan'))
