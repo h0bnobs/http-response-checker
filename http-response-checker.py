@@ -54,18 +54,19 @@ security_headers = {
 
 def banner():
     banner = """
-     _          
-    | |         
- ___| |__   ___ 
-/ __| '_ \ / __|
-\__ \ | | | (__ 
-|___/_| |_|\___|
+  _              
+ | |             
+ | |__  _ __ ___ 
+ | '_ \| '__/ __|
+ | | | | | | (__ 
+ |_| |_|_|  \___|
+                 
 
 https://github.com/h0bnobs/http-response-checker
 
-usage: security-header-checker.py -i <input_file> -u <target_url> -q -o <output_file>
+usage: http-response-checker.py -i <input_file> -u <target_url> -q -o <output_file>
     """
-    print(colored(banner, 'yellow'))
+    print(banner)
 
 
 def parse_args():
