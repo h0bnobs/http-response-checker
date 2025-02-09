@@ -1,8 +1,6 @@
 import argparse
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
 import requests
 from termcolor import colored
 import re
@@ -53,7 +51,7 @@ security_headers = {
 
 
 def banner():
-    banner = """
+    b = r"""
   _              
  | |             
  | |__  _ __ ___ 
@@ -66,7 +64,7 @@ https://github.com/h0bnobs/http-response-checker
 
 usage: http-response-checker.py -i <input_file> -u <target_url> -q -o <output_file>
     """
-    print(banner)
+    print(colored(b, 'green'))
 
 
 def parse_args():
@@ -90,20 +88,6 @@ COLOURS = {
     "warn": "\033[1;34m[\033[1;m\033[1;33m!\033[1;m\033[1;34m]",
     "end": "\033[1;m"
 }
-
-
-def print_pretty(dictionary, indent=0):
-    """
-    Prints a dictionary in a nicer form that is easier to read.
-    :param dictionary: Dictionary to pretty print
-    :param indent: The amount of indentation
-    """
-    for key, value in dictionary.items():
-        print('\t' * indent + colored(str(key), "red"))
-        if isinstance(value, dict):
-            print_pretty(value, indent + 1)
-        else:
-            print('\t' * (indent + 1) + str(value))
 
 
 def ffuf_parser(json_string):
@@ -194,9 +178,6 @@ def print_headers(headers, target_url):
             count += 1
             print(str(count) + ") " + colored("" + header + ": " + headers[header], "red"))
             pretty_print.update({str(count) + ") " + header: security_headers[header]})
-    print("\n" + COLOURS["plus"] + " Here are the recommendations for the security headers that were found on " + ":" +
-          COLOURS["end"] + "\n")
-    print_pretty(pretty_print)
 
 
 def get_headers(target_url):
@@ -245,7 +226,7 @@ def get_cookies(target_url):
     chrome_options.add_argument("--no-sandbox")  # Required for some environments
     chrome_options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
 
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+    driver = webdriver.Chrome(options=chrome_options)
 
     try:
         driver.get(target_url)
@@ -266,9 +247,7 @@ def get_cookies(target_url):
 
 
 if __name__ == '__main__':
-    banner()
     args = parse_args()
-
     if args.quiet and not args.output_file:
         print(COLOURS["warn"] + " Cannot use -q without -o!")
         sys.exit()
@@ -381,3 +360,4 @@ if __name__ == '__main__':
                 if count > three_quarters_mark and not printed_three_quarters:
                     print(colored('\n\n### Three quarters of the way through ###\n', 'yellow'))
                     printed_three_quarters = True
+    banner()
